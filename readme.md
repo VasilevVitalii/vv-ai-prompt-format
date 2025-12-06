@@ -36,7 +36,7 @@ $$begin
 $$@key=value
 $$system
 System prompt text here
-$$promt
+$$user
 User prompt text here
 $$end
 ```
@@ -45,12 +45,12 @@ $$end
 
 - `$$begin` - Start of a prompt block
 - `$$end` - End of a prompt block
-- `$$promt` - User prompt (required)
+- `$$user` - User prompt (required)
 - `$$system` - System prompt (optional)
 - `$$@key=value` - Custom parameters (optional)
 - Text before the first `$$begin` and after the last `$$end` is ignored
 - Section order within a block doesn't matter
-- All sections except `$$promt` are optional
+- All sections except `$$user` are optional
 
 ## Usage
 
@@ -64,7 +64,7 @@ $$begin
 $$@model=gpt-4
 $$system
 You are a helpful assistant
-$$promt
+$$user
 What is 2+2?
 $$end
 `
@@ -99,7 +99,7 @@ console.log(text)
 // $$@model=gpt-4
 // $$system
 // You are a helpful assistant
-// $$promt
+// $$user
 // Hello, world!
 // $$end
 ```
@@ -111,14 +111,14 @@ import { PromtLoad } from 'vv-ai-promt-store'
 
 const text = `
 $$begin
-$$promt
+$$user
 First prompt
 $$end
 
 $$begin
 $$system
 Different system prompt
-$$promt
+$$user
 Second prompt
 $$end
 `

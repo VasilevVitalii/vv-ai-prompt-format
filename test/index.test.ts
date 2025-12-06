@@ -3,7 +3,7 @@ import { PromtLoad, PromtStore, TPromt } from '../src/index.js'
 describe('PromtLoad', () => {
     test('парсит простой промпт с только user', () => {
         const raw = `$$begin
-$$promt
+$$user
 Hello World
 $$end`
 
@@ -19,7 +19,7 @@ $$end`
         const raw = `$$begin
 $$system
 You are a helpful assistant
-$$promt
+$$user
 What is 2+2?
 $$end`
 
@@ -34,7 +34,7 @@ $$end`
         const raw = `$$begin
 $$@model=gpt-4
 $$@temperature=0.7
-$$promt
+$$user
 Test prompt
 $$end`
 
@@ -54,7 +54,7 @@ $$@key1=value1
 $$@key2=value2
 $$system
 System prompt here
-$$promt
+$$user
 User prompt here
 $$end`
 
@@ -71,11 +71,11 @@ $$end`
 
     test('парсит несколько промптов', () => {
         const raw = `$$begin
-$$promt
+$$user
 First prompt
 $$end
 $$begin
-$$promt
+$$user
 Second prompt
 $$end`
 
@@ -90,7 +90,7 @@ $$end`
         const raw = `This is some random text
 That should be ignored
 $$begin
-$$promt
+$$user
 Actual prompt
 $$end`
 
@@ -102,7 +102,7 @@ $$end`
 
     test('игнорирует текст после последнего $$end', () => {
         const raw = `$$begin
-$$promt
+$$user
 Actual prompt
 $$end
 This is some random text
@@ -116,12 +116,12 @@ That should be ignored`
 
     test('игнорирует текст между промптами', () => {
         const raw = `$$begin
-$$promt
+$$user
 First
 $$end
 Random text here
 $$begin
-$$promt
+$$user
 Second
 $$end`
 
@@ -134,7 +134,7 @@ $$end`
 
     test('поддерживает многострочный промпт', () => {
         const raw = `$$begin
-$$promt
+$$user
 Line 1
 Line 2
 Line 3
@@ -151,7 +151,7 @@ $$end`
 $$system
 System line 1
 System line 2
-$$promt
+$$user
 User prompt
 $$end`
 
@@ -164,7 +164,7 @@ $$end`
 
     test('порядок секций не важен', () => {
         const raw = `$$begin
-$$promt
+$$user
 User prompt
 $$@key=value
 $$system
@@ -185,7 +185,7 @@ $$end`
         expect(result).toHaveLength(0)
     })
 
-    test('пропускает промпт без $$promt секции', () => {
+    test('пропускает промпт без $$user секции', () => {
         const raw = `$$begin
 $$system
 Only system, no user
@@ -197,7 +197,7 @@ $$end`
 
     test('обрабатывает пустые строки в промпте', () => {
         const raw = `$$begin
-$$promt
+$$user
 Line 1
 
 Line 3
@@ -219,7 +219,7 @@ describe('PromtStore', () => {
         const result = PromtStore(promts)
 
         expect(result).toBe(`$$begin
-$$promt
+$$user
 Hello World
 $$end`)
     })
@@ -235,7 +235,7 @@ $$end`)
         expect(result).toBe(`$$begin
 $$system
 You are helpful
-$$promt
+$$user
 Hello
 $$end`)
     })
@@ -253,7 +253,7 @@ $$end`)
 
         expect(result).toContain('$$@key1=value1')
         expect(result).toContain('$$@key2=value2')
-        expect(result).toContain('$$promt')
+        expect(result).toContain('$$user')
         expect(result).toContain('Test')
     })
 
@@ -286,7 +286,7 @@ $$end`)
         expect(result).toContain('$$@model=gpt-4')
         expect(result).toContain('$$system')
         expect(result).toContain('System prompt')
-        expect(result).toContain('$$promt')
+        expect(result).toContain('$$user')
         expect(result).toContain('User prompt')
         expect(result).toContain('$$end')
     })

@@ -18,7 +18,7 @@ function parse(content: string): TPromt[] {
 
     let inBlock = false
     let currentPromt: Partial<TPromt> | null = null
-    let currentSection: 'system' | 'promt' | null = null
+    let currentSection: 'system' | 'user' | null = null
     let sectionContent: string[] = []
 
     for (let i = 0; i < lines.length; i++) {
@@ -70,11 +70,11 @@ function parse(content: string): TPromt[] {
             continue
         }
 
-        if (trimmed === '$$promt') {
+        if (trimmed === '$$user') {
             if (currentSection && sectionContent.length > 0) {
                 finishSection(currentPromt, currentSection, sectionContent)
             }
-            currentSection = 'promt'
+            currentSection = 'user'
             sectionContent = []
             continue
         }
@@ -118,11 +118,11 @@ function parse(content: string): TPromt[] {
     return promts
 }
 
-function finishSection(promt: Partial<TPromt>, section: 'system' | 'promt', lines: string[]): void {
+function finishSection(promt: Partial<TPromt>, section: 'system' | 'user', lines: string[]): void {
     const content = lines.join('\n').trim()
     if (section === 'system') {
         promt.system = content
-    } else if (section === 'promt') {
+    } else if (section === 'user') {
         promt.user = content
     }
 }
@@ -144,7 +144,7 @@ function serialize(promts: TPromt[]): string {
             result.push(promt.system)
         }
 
-        result.push('$$promt')
+        result.push('$$user')
         result.push(promt.user)
 
         result.push('$$end')
