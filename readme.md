@@ -220,15 +220,46 @@ The `$$options` section supports various formats for values:
 
 ### Functions
 
-#### `PromtLoad(raw: string): TPromt[]`
+#### `PromtLoad(raw: string, use?: 'core' | 'json'): TPromt[]`
 
 Parses text and returns an array of prompts.
 
 **Parameters:**
 - `raw` - Text containing prompts in the specified format
+- `use` - Schema type for options validation (optional, default: `'core'`):
+  - `'core'` - Standard AI model settings (higher temperature, creativity)
+  - `'json'` - Structured JSON output settings (lower temperature, deterministic)
 
 **Returns:**
 - Array of `TPromt` objects
+
+**Example:**
+```typescript
+const prompts = PromtLoad(text, 'json') // Use JSON schema defaults
+```
+
+#### `PromtOptionsParse(use: 'core' | 'json', raw?: object, useAllOptions?: boolean): TPromtOptions`
+
+Parses and validates prompt options from a raw object.
+
+**Parameters:**
+- `use` - Schema type: `'core'` for standard AI models, `'json'` for structured JSON output
+- `raw` - Raw object containing option values to parse (optional)
+- `useAllOptions` - If `true`, returns all options with defaults; if `false`, returns only specified options (optional, default: `true`)
+
+**Returns:**
+- Validated `TPromtOptions` object. Invalid values are replaced with defaults. Never throws errors.
+
+**Example:**
+```typescript
+// Get all options with defaults
+const options = PromtOptionsParse('core', { temperature: 0.7 })
+// Returns: { temperature: 0.7, topP: 0.9, topK: 40, ... all other defaults }
+
+// Get only specified options
+const options = PromtOptionsParse('core', { temperature: 0.7 }, false)
+// Returns: { temperature: 0.7 }
+```
 
 #### `PromtStore(promt: TPromt[]): string`
 

@@ -1,6 +1,6 @@
 {
     "name": "vv-ai-promt-store",
-    "version": "1.1.0",
+    "version": "1.1.1",
     "description": "Helper for store promt in file",
     "main": "dist/src/index.js",
     "types": "dist/src/index.d.ts",
@@ -31,9 +31,12 @@
     "homepage": "https://github.com/VasilevVitalii/vv-config-jsonc#readme",
     "devDependencies": {
         "@types/jest": "^30.0.0",
-        "@types/node": "^24.10.1",
+        "@types/node": "^25.0.3",
         "jest": "^30.2.0",
-        "ts-jest": "^29.4.5",
+        "ts-jest": "^29.4.6",
         "typescript": "^5.9.3"
+    },
+    "dependencies": {
+        "@sinclair/typebox": "^0.34.47"
     }
 }

@@ -220,15 +220,46 @@ type TPromt = {
 
 ### Функции
 
-#### `PromtLoad(raw: string): TPromt[]`
+#### `PromtLoad(raw: string, use?: 'core' | 'json'): TPromt[]`
 
 Парсит текст и возвращает массив промптов.
 
 **Параметры:**
 - `raw` - Текст, содержащий промпты в указанном формате
+- `use` - Тип схемы для валидации options (опционально, по умолчанию: `'core'`):
+  - `'core'` - Стандартные настройки AI модели (выше temperature, креативность)
+  - `'json'` - Настройки для структурированного JSON вывода (ниже temperature, детерминированность)
 
 **Возвращает:**
 - Массив объектов `TPromt`
+
+**Пример:**
+```typescript
+const prompts = PromtLoad(text, 'json') // Использовать JSON схему с дефолтами
+```
+
+#### `PromtOptionsParse(use: 'core' | 'json', raw?: object, useAllOptions?: boolean): TPromtOptions`
+
+Парсит и валидирует опции промпта из сырого объекта.
+
+**Параметры:**
+- `use` - Тип схемы: `'core'` для стандартных AI моделей, `'json'` для структурированного JSON вывода
+- `raw` - Сырой объект с значениями опций для парсинга (опционально)
+- `useAllOptions` - Если `true`, возвращает все опции с дефолтами; если `false`, возвращает только указанные опции (опционально, по умолчанию: `true`)
+
+**Возвращает:**
+- Валидированный объект `TPromtOptions`. Невалидные значения заменяются на дефолтные. Никогда не выбрасывает ошибки.
+
+**Пример:**
+```typescript
+// Получить все опции с дефолтами
+const options = PromtOptionsParse('core', { temperature: 0.7 })
+// Вернет: { temperature: 0.7, topP: 0.9, topK: 40, ... все остальные дефолты }
+
+// Получить только указанные опции
+const options = PromtOptionsParse('core', { temperature: 0.7 }, false)
+// Вернет: { temperature: 0.7 }
+```
 
 #### `PromtStore(promt: TPromt[]): string`
 
