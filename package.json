@@ -1,6 +1,6 @@
 {
     "name": "vv-ai-promt-store",
-    "version": "1.1.1",
+    "version": "1.1.2",
     "description": "Helper for store promt in file",
     "main": "dist/src/index.js",
     "types": "dist/src/index.d.ts",

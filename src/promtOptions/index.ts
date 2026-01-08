@@ -25,6 +25,10 @@ export const SPromtOptions = Type.Object({
 	),
 	trimWhitespace: Type.Optional(Type.Boolean({ ...PromtValue.trimWhitespace, default: defVal.trimWhitespace })),
 	seed: Type.Optional(Type.Integer({ ...PromtValue.seed })),
+	tokenBias: Type.Optional(Type.Record(Type.String(), Type.Number(), { ...PromtValue.tokenBias, default: defVal.tokenBias })),
+	evaluationPriority: Type.Optional(Type.Integer({ ...PromtValue.evaluationPriority, default: defVal.evaluationPriority })),
+	contextShiftSize: Type.Optional(Type.Integer({ ...PromtValue.contextShiftSize, default: defVal.contextShiftSize })),
+	disableContextShift: Type.Optional(Type.Boolean({ ...PromtValue.disableContextShift, default: defVal.disableContextShift })),
 })
 
 export const SPromtOptionsJson = Type.Object({
@@ -49,6 +53,61 @@ export const SPromtOptionsJson = Type.Object({
 	),
 	trimWhitespace: Type.Optional(Type.Boolean({ ...PromtValue.trimWhitespace, default: defValJson.trimWhitespace })),
 	seed: Type.Optional(Type.Integer({ ...PromtValue.seed })),
+	tokenBias: Type.Optional(Type.Record(Type.String(), Type.Number(), { ...PromtValue.tokenBias, default: defValJson.tokenBias })),
+	evaluationPriority: Type.Optional(Type.Integer({ ...PromtValue.evaluationPriority, default: defValJson.evaluationPriority })),
+	contextShiftSize: Type.Optional(Type.Integer({ ...PromtValue.contextShiftSize, default: defValJson.contextShiftSize })),
+	disableContextShift: Type.Optional(Type.Boolean({ ...PromtValue.disableContextShift, default: defValJson.disableContextShift })),
 })
 
 export type TPromtOptions = Static<typeof SPromtOptions>
+
+export type TPromtOptionsOpenAi = {
+	temperature?: number
+	top_p?: number
+	max_tokens?: number
+	frequency_penalty?: number
+	presence_penalty?: number
+	seed?: number
+	stop?: string[]
+	logit_bias?: Record<string, number>
+}
+
+export type TPromtOptionsOllama = {
+	temperature?: number
+	top_p?: number
+	top_k?: number
+	min_p?: number
+	num_predict?: number
+	repeat_penalty?: number
+	repeat_last_n?: number
+	mirostat?: number
+	mirostat_tau?: number
+	mirostat_eta?: number
+	tfs_z?: number
+	seed?: number
+	stop?: string[]
+	penalize_newline?: boolean
+}
+
+export type TPromtOptionsLlamaCpp = {
+	temperature?: number
+	topP?: number
+	topK?: number
+	minP?: number
+	maxTokens?: number
+	seed?: number
+	trimWhitespaceSuffix?: boolean
+	customStopTriggers?: (string | string[])[]
+	tokenBias?: Record<string, number> | (() => Record<string, number>)
+	evaluationPriority?: number
+	contextShiftSize?: number
+	disableContextShift?: boolean
+	repeatPenalty?: false | {
+		lastTokens?: number
+		penalty?: number
+		frequencyPenalty?: number
+		presencePenalty?: number
+		penalizeNewLine?: boolean
+		punishTokensFilter?: (tokens: any[]) => any[]
+	}
+}
