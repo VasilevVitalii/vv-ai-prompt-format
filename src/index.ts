@@ -7,6 +7,7 @@ export type TPromt = {
 	user: string
 	options?: TPromtOptions
 	segment?: Record<string, string>
+	grammar?: string
 }
 
 /**
@@ -79,6 +80,7 @@ export function PromtOptionsParse(use: 'core' | 'json', raw?: object, useAllOpti
  * - `$$system` - System message (optional)
  * - `$$user` - User message (required)
  * - `$$options` - Model parameters in key=value format (optional)
+ * - `$$grammar` - JSON Schema grammar for structured output (optional)
  * - `$$segment=name` - Named content segments (optional)
  *
  * @example
@@ -91,10 +93,12 @@ export function PromtOptionsParse(use: 'core' | 'json', raw?: object, useAllOpti
  * You are a helpful assistant
  * $$user
  * Hello, world!
+ * $$grammar
+ * {"type": "object", "properties": {}}
  * $$end`
  *
  * const prompts = PromtLoad(text)
- * // Returns: [{ system: '...', user: '...', options: { temperature: 0.7, maxTokens: 2048 } }]
+ * // Returns: [{ system: '...', user: '...', options: {...}, grammar: '...' }]
  * ```
  */
 export function PromtLoad(raw: string, use: 'core' | 'json' = 'core'): TPromt[] {
@@ -110,16 +114,18 @@ export function PromtLoad(raw: string, use: 'core' | 'json' = 'core'): TPromt[] 
  * @remarks
  * Output format structure:
  * - Each prompt is wrapped in `$$begin` / `$$end`
- * - Sections are ordered: $$options, $$system, $$user, $$segment=*
+ * - Sections are ordered: $$options, $$system, $$user, $$grammar, $$segment=*
  * - Options are serialized in key=value format
  * - Arrays are serialized as JSON
+ * - Grammar is stored as formatted JSON Schema
  *
  * @example
  * ```typescript
  * const prompts: TPromt[] = [{
  *   system: 'You are helpful',
  *   user: 'Hello!',
- *   options: { temperature: 0.7 }
+ *   options: { temperature: 0.7 },
+ *   grammar: '{"type": "object"}'
  * }]
  *
  * const text = PromtStore(prompts)
@@ -131,6 +137,8 @@ export function PromtLoad(raw: string, use: 'core' | 'json' = 'core'): TPromt[] 
  * // You are helpful
  * // $$user
  * // Hello!
+ * // $$grammar
+ * // {"type": "object"}
  * // $$end
  * ```
  */
@@ -321,13 +329,47 @@ export function ToPromtOptionsLlamaCpp(options: TPromtOptions): TPromtOptionsLla
 	return result
 }
 
+/**
+ * Validates JSON Schema grammar string.
+ *
+ * @param raw - JSON Schema grammar string to validate
+ * @returns Validated and formatted JSON Schema string, or empty string if invalid
+ *
+ * @remarks
+ * This function:
+ * - Parses the JSON string to verify it's valid JSON
+ * - Returns formatted JSON string if valid
+ * - Returns empty string if parsing fails or input is empty
+ *
+ * @example
+ * ```typescript
+ * const grammar = GrammarCheck('{"type": "object", "properties": {}}')
+ * // Returns: '{\n  "type": "object",\n  "properties": {}\n}'
+ *
+ * const invalid = GrammarCheck('invalid json')
+ * // Returns: ''
+ * ```
+ */
+export function GrammarCheck(raw: string): string {
+	if (!raw || raw.trim() === '') {
+		return ''
+	}
+
+	try {
+		const parsed = JSON.parse(raw)
+		return JSON.stringify(parsed, null, 2)
+	} catch {
+		return ''
+	}
+}
+
 function parse(content: string, use: 'core' | 'json'): TPromt[] {
 	const lines = content.split('\n')
 	const promts: TPromt[] = []
 
 	let inBlock = false
 	let currentPromt: Partial<TPromt> | null = null
-	let currentSection: 'system' | 'user' | 'segment' | 'options' | null = null
+	let currentSection: 'system' | 'user' | 'segment' | 'options' | 'grammar' | null = null
 	let currentSegmentName: string | null = null
 	let sectionContent: string[] = []
 
@@ -403,6 +445,16 @@ function parse(content: string, use: 'core' | 'json'): TPromt[] {
 			continue
 		}
 
+		if (trimmed === '$$grammar') {
+			if (currentSection && sectionContent.length > 0) {
+				finishSection(currentPromt, currentSection, sectionContent, use, currentSegmentName)
+			}
+			currentSection = 'grammar'
+			currentSegmentName = null
+			sectionContent = []
+			continue
+		}
+
 		if (trimmed.startsWith('$$segment=')) {
 			if (currentSection && sectionContent.length > 0) {
 				finishSection(currentPromt, currentSection, sectionContent, use, currentSegmentName)
@@ -430,7 +482,7 @@ function parse(content: string, use: 'core' | 'json'): TPromt[] {
 	return promts
 }
 
-function finishSection(promt: Partial<TPromt>, section: 'system' | 'user' | 'segment' | 'options', lines: string[], use: 'core' | 'json', segmentName?: string | null): void {
+function finishSection(promt: Partial<TPromt>, section: 'system' | 'user' | 'segment' | 'options' | 'grammar', lines: string[], use: 'core' | 'json', segmentName?: string | null): void {
 	const content = lines.join('\n').trim()
 	if (section === 'system') {
 		promt.system = content
@@ -444,6 +496,11 @@ function finishSection(promt: Partial<TPromt>, section: 'system' | 'user' | 'seg
 	} else if (section === 'options') {
 		const rawOptions = parseOptionsToObject(content)
 		promt.options = PromtOptionsParse(use, rawOptions, false)
+	} else if (section === 'grammar') {
+		const validated = GrammarCheck(content)
+		if (validated) {
+			promt.grammar = validated
+		}
 	}
 }
 
@@ -529,6 +586,11 @@ function serialize(promts: TPromt[]): string {
 
 		result.push('$$user')
 		result.push(promt.user)
+
+		if (promt.grammar) {
+			result.push('$$grammar')
+			result.push(promt.grammar)
+		}
 
 		if (promt.segment) {
 			for (const [key, value] of Object.entries(promt.segment)) {
