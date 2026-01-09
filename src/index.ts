@@ -1,4 +1,13 @@
-export { TPromtOptions, TPromtOptionsOpenAi, TPromtOptionsOllama, TPromtOptionsLlamaCpp, SPromtOptions, SPromtOptionsJson } from './promtOptions/index.js'
+export {
+	TPromtOptions,
+	TPromtOptionsOpenAi,
+	TPromtOptionsOllama,
+	TPromtOptionsLlamaCpp,
+	SPromtOptions,
+	SPromtOptionsJson,
+	defVal,
+	defValJson,
+} from './promtOptions/index.js'
 export { CheckJsonSchema } from './checkJsonSchema.js'
 export { PromtOptionsParse } from './promtOptionsParse.js'
 export { PromtLoad } from './promtLoad.js'
