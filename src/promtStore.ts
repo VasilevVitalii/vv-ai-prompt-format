@@ -89,5 +89,9 @@ function serializeOptionValue(key: keyof TPromtOptions, value: any): string {
 		return `${key}=${JSON.stringify(value)}`
 	}
 
+	if (typeof value === 'object' && value !== null) {
+		return `${key}=${JSON.stringify(value)}`
+	}
+
 	return `${key}=${value}`
 }

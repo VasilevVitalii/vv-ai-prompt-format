@@ -645,4 +645,35 @@ describe('PromtLoad + PromtStore round-trip', () => {
             seg2: 'Segment 2'
         })
     })
+
+    test('сохраняет все параметры включая tokenBias и массивы при round-trip', () => {
+        const original: TPromt[] = [
+            {
+                system: 'Test system',
+                user: 'Test user',
+                options: {
+                    temperature: 0.8,
+                    topP: 0.95,
+                    topK: 40,
+                    minP: 0.05,
+                    maxTokens: 2048,
+                    frequencyPenalty: 0.5,
+                    presencePenalty: 0.3,
+                    repeatPenalty: 1.1,
+                    repeatPenaltyNum: 64,
+                    stopSequences: ['stop1', 'stop2', 'stop3'],
+                    tokenBias: { '123': 0.5, '456': -0.3, '789': 1.0 },
+                    trimWhitespace: true,
+                    penalizeNewline: false,
+                    seed: 42
+                }
+            }
+        ]
+
+        const serialized = PromtStore(original)
+        const parsed = PromtLoad(serialized)
+
+        expect(parsed).toHaveLength(1)
+        expect(parsed[0].options).toEqual(original[0].options)
+    })
 })

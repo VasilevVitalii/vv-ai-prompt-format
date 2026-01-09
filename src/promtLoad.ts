@@ -200,7 +200,7 @@ function parseOptionsToObject(content: string): Record<string, any> {
 	return options
 }
 
-function parseOptionValue(valueStr: string): number | boolean | string[] | undefined {
+function parseOptionValue(valueStr: string): number | boolean | string[] | Record<string, any> | undefined {
 	// Пустое значение = undefined
 	if (valueStr === '') {
 		return undefined
@@ -212,11 +212,11 @@ function parseOptionValue(valueStr: string): number | boolean | string[] | undef
 		cleanValue = cleanValue.slice(1, -1)
 	}
 
-	// Пробуем распарсить как JSON (для массивов)
-	if (valueStr.startsWith('[')) {
+	// Пробуем распарсить как JSON (для массивов и объектов)
+	if (valueStr.startsWith('[') || valueStr.startsWith('{')) {
 		try {
 			const parsed = JSON.parse(valueStr)
-			if (Array.isArray(parsed)) {
+			if (Array.isArray(parsed) || typeof parsed === 'object') {
 				return parsed
 			}
 		} catch {
