@@ -1,6 +1,6 @@
 import { TPromtOptions, TPromtOptionsOpenAi, TPromtOptionsOllama, TPromtOptionsLlamaCpp } from './promtOptions/index.js'
 import { CheckJsonSchema } from './checkJsonSchema.js'
-import { convertJsonSchemaToGbnf } from './convertJsonSchemaToGbnf.js'
+import { ConvertJsonSchemaToGbnf } from './convertJsonSchemaToGbnf.js'
 
 /**
  * Converts universal prompt options to OpenAI API format.
@@ -225,7 +225,7 @@ export function ToPromtOptionsLlamaCpp(options: TPromtOptions, grammar?: string)
 	if (grammar) {
 		try {
 			const schema = JSON.parse(grammar)
-			const converted = convertJsonSchemaToGbnf(schema)
+			const converted = ConvertJsonSchemaToGbnf(schema)
 			if ('result' in converted) {
 				result.grammar = converted.result
 			}

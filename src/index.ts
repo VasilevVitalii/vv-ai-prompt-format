@@ -4,7 +4,7 @@ export { PromtOptionsParse } from './promtOptionsParse.js'
 export { PromtLoad } from './promtLoad.js'
 export { PromtStore } from './promtStore.js'
 export { ToPromtOptionsOpenAi, ToPromtOptionsOllama, ToPromtOptionsLlamaCpp } from './toPromtOptions.js'
-export { convertJsonSchemaToGbnf } from './convertJsonSchemaToGbnf.js'
+export { ConvertJsonSchemaToGbnf } from './convertJsonSchemaToGbnf.js'
 
 export type TPromt = {
 	system?: string

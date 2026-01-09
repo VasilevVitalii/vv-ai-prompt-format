@@ -28,7 +28,7 @@
  *   }
  * }
  *
- * const result = convertJsonSchemaToGbnf(schema)
+ * const result = ConvertJsonSchemaToGbnf(schema)
  * if ('result' in result) {
  *   console.log(result.result) // GBNF grammar object
  * } else {
@@ -36,7 +36,7 @@
  * }
  * ```
  */
-export function convertJsonSchemaToGbnf(schema: any): { error: string } | { result: any } {
+export function ConvertJsonSchemaToGbnf(schema: any): { error: string } | { result: any } {
 	try {
 		const converted = convertJsonSchemaToGbnfInternal(schema)
 		return { result: converted }
