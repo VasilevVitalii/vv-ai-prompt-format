@@ -1,7 +1,7 @@
 {
-    "name": "vv-ai-promt-store",
-    "version": "2.0.2",
-    "description": "Helper for store promt in file",
+    "name": "vv-ai-prompt-format",
+    "version": "3.0.0",
+    "description": "Helper for store prompt in file",
     "main": "dist/src/index.js",
     "types": "dist/src/index.d.ts",
     "exports": {
