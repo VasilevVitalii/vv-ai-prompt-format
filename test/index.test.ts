@@ -286,11 +286,11 @@ $$end`
         })
     })
 
-    test('парсит boolean значения 0/1', () => {
+    test('парсит числовые 0 и 1 как числа (не boolean)', () => {
         const raw = `$$begin
 $$options
-penalizeNewline=1
-trimWhitespace=0
+temperature=0
+mirostat=1
 $$user
 Test
 $$end`
@@ -299,8 +299,8 @@ $$end`
 
         expect(result).toHaveLength(1)
         expect(result[0].options).toEqual({
-            penalizeNewline: true,
-            trimWhitespace: false
+            temperature: 0,
+            mirostat: 1
         })
     })
 

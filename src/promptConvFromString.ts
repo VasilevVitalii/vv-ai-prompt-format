@@ -246,17 +246,17 @@ function parseOptionValue(valueStr: string): number | boolean | string | string[
 		}
 	}
 
-	// Boolean значения
-	const lower = cleanValue.toLowerCase()
-	if (lower === 'true' || lower === '1' || lower === 'y') return true
-	if (lower === 'false' || lower === '0' || lower === 'n') return false
-
-	// Числовые значения - заменяем запятую на точку
+	// Числовые значения - проверяем ПЕРЕД boolean, чтобы "0" и "1" парсились как числа
 	const numValue = cleanValue.replace(',', '.')
 	const parsed = parseFloat(numValue)
 	if (!isNaN(parsed)) {
 		return parsed
 	}
+
+	// Boolean значения (только true/false/y/n, без 0/1 чтобы не конфликтовать с числами)
+	const lower = cleanValue.toLowerCase()
+	if (lower === 'true' || lower === 'y') return true
+	if (lower === 'false' || lower === 'n') return false
 
 	// Если ничего не подошло, возвращаем как строку
 	return cleanValue
