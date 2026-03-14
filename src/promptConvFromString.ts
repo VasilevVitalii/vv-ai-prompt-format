@@ -185,13 +185,16 @@ function finishSection(prompt: Partial<TPrompt>, section: 'system' | 'user' | 's
 		prompt.options = PromptOptionsParse(use, rawOptions, false)
 	} else if (section === 'llm') {
 		const llmConfig = parseOptionsToObject(content)
-		if (llmConfig.url || llmConfig.model) {
+		if (llmConfig.url || llmConfig.model || llmConfig.gpulayer !== undefined) {
 			prompt.llm = {}
 			if (llmConfig.url) {
 				prompt.llm.url = String(llmConfig.url)
 			}
 			if (llmConfig.model) {
 				prompt.llm.model = String(llmConfig.model)
+			}
+			if (llmConfig.gpulayer !== undefined) {
+				prompt.llm.gpulayer = Number(llmConfig.gpulayer)
 			}
 		}
 	} else if (section === 'jsonresponse') {

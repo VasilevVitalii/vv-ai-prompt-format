@@ -56,6 +56,9 @@ function serialize(prompts: TPrompt[]): string {
 			if (prompt.llm.model !== undefined) {
 				result.push(`model=${prompt.llm.model}`)
 			}
+			if (prompt.llm.gpulayer !== undefined) {
+				result.push(`gpulayer=${prompt.llm.gpulayer}`)
+			}
 		}
 
 		if (prompt.options) {

@@ -911,6 +911,88 @@ $$end`
         expect(parsed[0].llm).toEqual({ model: 'claude-3' })
         expect(parsed[0].llm?.url).toBeUndefined()
     })
+
+    test('парсит gpulayer из секции $$llm', () => {
+        const raw = `$$begin
+$$llm
+url=http://localhost:8080
+model=llama2
+gpulayer=33
+$$user
+Test prompt
+$$end`
+
+        const result = PromptConvFromString(raw)
+
+        expect(result).toHaveLength(1)
+        expect(result[0].llm).toEqual({
+            url: 'http://localhost:8080',
+            model: 'llama2',
+            gpulayer: 33
+        })
+    })
+
+    test('парсит промпт только с gpulayer в $$llm', () => {
+        const raw = `$$begin
+$$llm
+gpulayer=0
+$$user
+Test prompt
+$$end`
+
+        const result = PromptConvFromString(raw)
+
+        expect(result).toHaveLength(1)
+        expect(result[0].llm).toEqual({ gpulayer: 0 })
+        expect(result[0].llm?.url).toBeUndefined()
+        expect(result[0].llm?.model).toBeUndefined()
+    })
+
+    test('сериализует gpulayer в секцию $$llm', () => {
+        const prompts: TPrompt[] = [{
+            user: 'Test',
+            llm: {
+                url: 'http://localhost:11434',
+                model: 'llama2',
+                gpulayer: 33
+            }
+        }]
+
+        const result = PromptConvToString(prompts)
+
+        expect(result).toContain('$$llm')
+        expect(result).toContain('url=http://localhost:11434')
+        expect(result).toContain('model=llama2')
+        expect(result).toContain('gpulayer=33')
+    })
+
+    test('round-trip сохраняет gpulayer', () => {
+        const original: TPrompt[] = [{
+            llm: {
+                url: 'http://localhost:11434',
+                model: 'llama2',
+                gpulayer: 33
+            },
+            user: 'Test prompt'
+        }]
+
+        const serialized = PromptConvToString(original)
+        const parsed = PromptConvFromString(serialized)
+
+        expect(parsed[0].llm).toEqual(original[0].llm)
+    })
+
+    test('round-trip сохраняет gpulayer=0', () => {
+        const original: TPrompt[] = [{
+            llm: { gpulayer: 0 },
+            user: 'Test'
+        }]
+
+        const serialized = PromptConvToString(original)
+        const parsed = PromptConvFromString(serialized)
+
+        expect(parsed[0].llm?.gpulayer).toBe(0)
+    })
 })
 
 describe('$$jsonresponse section', () => {
