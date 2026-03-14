@@ -36,6 +36,7 @@ $$begin
 $$llm
 url=http://localhost:11434
 model=llama2
+gpulayer=33
 $$options
 temperature=0.7
 maxTokens=4096
@@ -56,7 +57,7 @@ $$end
 - `$$end` - End of a prompt block
 - `$$user` - User prompt (required)
 - `$$system` - System prompt (optional)
-- `$$llm` - LLM configuration with url and model (optional)
+- `$$llm` - LLM configuration with url, model and gpulayer (optional)
 - `$$options` - LLM settings section (optional)
 - `$$jsonresponse` - JSON Schema for structured response output (optional)
 - `$$segment=name` - Named text segments (optional)
@@ -216,7 +217,8 @@ import { PromptConvFromString, PromptConvToString, TPrompt } from 'vv-ai-prompt-
 const prompts: TPrompt[] = [{
   llm: {
     url: 'http://localhost:11434',
-    model: 'llama2'
+    model: 'llama2',
+    gpulayer: 33
   },
   user: 'What is the meaning of life?',
   options: {
@@ -231,6 +233,7 @@ console.log(text)
 // $$llm
 // url=http://localhost:11434
 // model=llama2
+// gpulayer=33
 // $$options
 // temperature=0.7
 // maxTokens=2048
@@ -239,7 +242,7 @@ console.log(text)
 // $$end
 
 const parsed = PromptConvFromString(text)
-console.log(parsed[0].llm) // { url: 'http://localhost:11434', model: 'llama2' }
+console.log(parsed[0].llm) // { url: 'http://localhost:11434', model: 'llama2', gpulayer: 33 }
 ```
 
 ## API
@@ -271,7 +274,7 @@ type TPrompt = {
   options?: TPromptOptions
   segment?: Record<string, string>
   jsonresponse?: string
-  llm?: { url?: string; model?: string }
+  llm?: { url?: string; model?: string; gpulayer?: number }
 }
 ```
 
