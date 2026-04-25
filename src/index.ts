@@ -9,6 +9,7 @@ export {
 	defValJson,
 } from './promptOptions/index.js'
 export { CheckJsonSchema } from './checkJsonSchema.js'
+export { CheckJsonToolSpec } from './checkJsonToolSpec.js'
 export { PromptOptionsParse } from './promptOptionsParse.js'
 export { PromptConvFromString } from './promptConvFromString.js'
 export { PromptConvToString } from './promptConvToString.js'

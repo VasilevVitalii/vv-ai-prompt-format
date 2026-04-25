@@ -1,4 +1,4 @@
-import { PromptConvFromString, PromptConvToString, TPrompt } from '../src/index.js'
+import { PromptConvFromString, PromptConvToString, TPrompt, CheckJsonToolSpec } from '../src/index.js'
 
 describe('PromptConvFromString', () => {
     test('парсит простой промпт с только user', () => {
@@ -1457,5 +1457,69 @@ $$end`
 
         expect(parsed).toHaveLength(1)
         expect(parsed[0].tool).toEqual(original[0].tool)
+    })
+})
+
+describe('CheckJsonToolSpec', () => {
+    test('возвращает undefined для undefined', () => {
+        expect(CheckJsonToolSpec(undefined)).toBeUndefined()
+    })
+
+    test('возвращает undefined для пустой строки', () => {
+        expect(CheckJsonToolSpec('')).toBeUndefined()
+    })
+
+    test('возвращает undefined для строки из пробелов', () => {
+        expect(CheckJsonToolSpec('   ')).toBeUndefined()
+    })
+
+    test('возвращает undefined для валидной схемы с type object', () => {
+        const spec = JSON.stringify({ type: 'object', properties: { query: { type: 'string' } } })
+        expect(CheckJsonToolSpec(spec)).toBeUndefined()
+    })
+
+    test('возвращает undefined для схемы без properties', () => {
+        const spec = JSON.stringify({ type: 'object' })
+        expect(CheckJsonToolSpec(spec)).toBeUndefined()
+    })
+
+    test('возвращает undefined для схемы с required', () => {
+        const spec = JSON.stringify({
+            type: 'object',
+            properties: { query: { type: 'string' }, limit: { type: 'number' } },
+            required: ['query']
+        })
+        expect(CheckJsonToolSpec(spec)).toBeUndefined()
+    })
+
+    test('возвращает ошибку для невалидного JSON', () => {
+        expect(CheckJsonToolSpec('not a json')).toBeDefined()
+    })
+
+    test('возвращает ошибку для JSON-массива', () => {
+        expect(CheckJsonToolSpec('[{"type":"object"}]')).toBeDefined()
+    })
+
+    test('возвращает ошибку для JSON-строки', () => {
+        expect(CheckJsonToolSpec('"just a string"')).toBeDefined()
+    })
+
+    test('возвращает ошибку если type не object', () => {
+        const spec = JSON.stringify({ type: 'string' })
+        const result = CheckJsonToolSpec(spec)
+        expect(result).toBeDefined()
+        expect(result).toContain('"object"')
+    })
+
+    test('возвращает ошибку если type отсутствует', () => {
+        const spec = JSON.stringify({ properties: { query: { type: 'string' } } })
+        const result = CheckJsonToolSpec(spec)
+        expect(result).toBeDefined()
+        expect(result).toContain('"object"')
+    })
+
+    test('возвращает ошибку для невалидной JSON Schema', () => {
+        const spec = JSON.stringify({ type: 'object', properties: { q: { type: 'invalidtype' } } })
+        expect(CheckJsonToolSpec(spec)).toBeDefined()
     })
 })
