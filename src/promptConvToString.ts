@@ -88,6 +88,21 @@ function serialize(prompts: TPrompt[]): string {
 			}
 		}
 
+		if (prompt.tool && prompt.tool.length > 0) {
+			result.push('$$tool')
+			result.push(JSON.stringify(prompt.tool.map(t => {
+				const entry: { name: string; spec?: string } = { name: t.name }
+				if (t.spec !== undefined) entry.spec = t.spec
+				return entry
+			})))
+			for (const tool of prompt.tool) {
+				if (tool.lang && tool.code !== undefined) {
+					result.push(`$$tool=${tool.lang}=${tool.name}`)
+					result.push(tool.code)
+				}
+			}
+		}
+
 		result.push('$$end')
 	}
 

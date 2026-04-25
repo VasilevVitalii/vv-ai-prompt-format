@@ -20,6 +20,7 @@
 - Пользовательские параметры для каждого промпта
 - Несколько промптов в одном файле
 - Парсинг и сериализация промптов в/из текста
+- Поддержка tool calling: серверный, клиентский и inline режимы выполнения
 
 ## Установка
 
@@ -48,6 +49,10 @@ $$jsonresponse
 {"type": "object", "properties": {"name": {"type": "string"}}}
 $$segment=имяСегмента
 Содержимое сегмента
+$$tool
+[{"name":"calculator"},{"name":"search","spec":"Ищет в интернете. Аргументы: query (string)"}]
+$$tool=JS=search
+return await fetch(`https://api.search.com?q=${args.query}`).then(r => r.json())
 $$end
 ```
 
@@ -61,6 +66,8 @@ $$end
 - `$$options` - Секция настроек LLM (опционально)
 - `$$jsonresponse` - JSON Schema для структурированного вывода ответа (опционально)
 - `$$segment=имя` - Именованные текстовые сегменты (опционально)
+- `$$tool` - Список инструментов, доступных модели (опционально)
+- `$$tool=<lang>=<имя>` - Inline-код инструмента (опционально, требует соответствующей записи со `spec` в `$$tool`)
 - Текст до первого `$$begin` и после последнего `$$end` игнорируется
 - Порядок секций внутри блока не важен
 - Все секции, кроме `$$user`, опциональны
@@ -207,6 +214,107 @@ const parsed = PromptConvFromString(text)
 console.log(parsed[0].segment.code) // Доступ к содержимому сегмента
 ```
 
+### Работа с инструментами
+
+Секция `$$tool` определяет список инструментов, доступных модели. Каждый инструмент — объект с полями `name` и опциональным `spec`. Поле `spec` — произвольное описание для модели: что делает инструмент и какие аргументы принимает.
+
+Поддерживаются три режима выполнения в зависимости от наличия `spec` и секции с кодом:
+
+#### 1. Серверный инструмент — сервис выполняет сам, spec не нужен
+
+Сервис уже знает эти инструменты и умеет их выполнять. В `$$tool` передаются только имена, поле `spec` не указывается.
+
+```typescript
+import { PromptConvFromString, PromptConvToString, TPrompt } from 'vv-ai-prompt-format'
+
+const prompts: TPrompt[] = [{
+  user: 'Сколько будет 2 + 2?',
+  tool: [
+    { name: 'calculator' },
+    { name: 'datetime' }
+  ]
+}]
+
+const text = PromptConvToString(prompts)
+console.log(text)
+// $$begin
+// $$user
+// Сколько будет 2 + 2?
+// $$tool
+// [{"name":"calculator"},{"name":"datetime"}]
+// $$end
+
+const parsed = PromptConvFromString(text)
+console.log(parsed[0].tool)
+// [{ name: 'calculator' }, { name: 'datetime' }]
+```
+
+#### 2. Клиентский инструмент — выполняет клиент, spec обязателен
+
+Сервис не знает код инструмента. Когда модель решает его вызвать, сервис запрашивает вызывающую сторону (клиента) выполнить вызов и вернуть результат. Поле `spec` сообщает модели, что делает инструмент и какие аргументы передавать.
+
+```typescript
+import { PromptConvFromString, PromptConvToString, TPrompt } from 'vv-ai-prompt-format'
+
+const prompts: TPrompt[] = [{
+  user: 'Найди последний релиз TypeScript',
+  tool: [
+    {
+      name: 'search',
+      spec: 'Ищет в интернете и возвращает результаты. Аргументы: query (string) — поисковый запрос'
+    }
+  ]
+}]
+
+const text = PromptConvToString(prompts)
+console.log(text)
+// $$begin
+// $$user
+// Найди последний релиз TypeScript
+// $$tool
+// [{"name":"search","spec":"Ищет в интернете и возвращает результаты. Аргументы: query (string) — поисковый запрос"}]
+// $$end
+
+const parsed = PromptConvFromString(text)
+console.log(parsed[0].tool)
+// [{ name: 'search', spec: 'Ищет в интернете и возвращает результаты. Аргументы: query (string) — поисковый запрос' }]
+```
+
+#### 3. Inline-инструмент — сервис выполняет переданный код, spec обязателен
+
+Код инструмента передаётся прямо в запросе через секцию `$$tool=<lang>=<имя>`. Сервис выполняет его самостоятельно. Поле `spec` по-прежнему обязательно, чтобы модель знала, когда и как вызывать инструмент. Значение `lang` — произвольная строка (например, `JS`, `PY`); библиотека не валидирует его.
+
+```typescript
+import { PromptConvFromString, PromptConvToString, TPrompt } from 'vv-ai-prompt-format'
+
+const prompts: TPrompt[] = [{
+  user: 'Сложи 5 и 7',
+  tool: [
+    {
+      name: 'add',
+      spec: 'Складывает два числа. Аргументы: a (number), b (number)',
+      lang: 'JS',
+      code: 'return args.a + args.b'
+    }
+  ]
+}]
+
+const text = PromptConvToString(prompts)
+console.log(text)
+// $$begin
+// $$user
+// Сложи 5 и 7
+// $$tool
+// [{"name":"add","spec":"Складывает два числа. Аргументы: a (number), b (number)"}]
+// $$tool=JS=add
+// return args.a + args.b
+// $$end
+
+const parsed = PromptConvFromString(text)
+console.log(parsed[0].tool)
+// [{ name: 'add', spec: 'Складывает два числа. Аргументы: a (number), b (number)', lang: 'JS', code: 'return args.a + args.b' }]
+```
+
 ### Работа с конфигурацией LLM
 
 Секция `$$llm` позволяет указать URL эндпоинта LLM и название модели:
@@ -268,6 +376,13 @@ type TPromptOptions = {
   trimWhitespace?: boolean
 }
 
+type TPromptTool = {
+  name: string
+  spec?: string    // описание для модели: что делает инструмент и какие аргументы передавать
+  lang?: string    // язык программирования inline-кода (например, 'JS', 'PY')
+  code?: string    // inline-код, выполняемый сервисом
+}
+
 type TPrompt = {
   system?: string
   user: string
@@ -275,6 +390,7 @@ type TPrompt = {
   segment?: Record<string, string>
   jsonresponse?: string
   llm?: { url?: string; model?: string; gpulayer?: number }
+  tool?: TPromptTool[]
 }
 ```
 

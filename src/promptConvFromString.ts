@@ -1,44 +1,12 @@
 import { TPrompt } from './index.js'
 import { PromptOptionsParse } from './promptOptionsParse.js'
 
-/**
- * Loads and parses prompts from a text string with structured sections.
- *
- * @param raw - Raw text string containing prompts in the format with $$begin/$$end markers
- * @param use - Schema type for options validation: 'core' for standard AI models, 'json' for structured JSON output (default: 'core')
- * @returns Array of parsed TPrompt objects
- *
- * @remarks
- * Text format supports the following sections:
- * - `$$begin` / `$$end` - Marks prompt boundaries
- * - `$$system` - System message (optional)
- * - `$$user` - User message (required)
- * - `$$options` - Model parameters in key=value format (optional)
- * - `$$llm` - LLM configuration with url and model (optional)
- * - `$$jsonresponse` - JSON Schema for structured response output (optional)
- * - `$$segment=name` - Named content segments (optional)
- *
- * @example
- * ```typescript
- * const text = `$$begin
- * $$options
- * temperature=0.7
- * maxTokens=2048
- * $$system
- * You are a helpful assistant
- * $$user
- * Hello, world!
- * $$jsonresponse
- * {"type": "object", "properties": {}}
- * $$end`
- *
- * const prompts = PromptConvFromString(text)
- * // Returns: [{ system: '...', user: '...', options: {...}, jsonresponse: '...' }]
- * ```
- */
 export function PromptConvFromString(raw: string, use: 'core' | 'json' = 'core'): TPrompt[] {
 	return parse(raw, use)
 }
+
+type NonToolcodeSectionType = 'system' | 'user' | 'segment' | 'options' | 'llm' | 'jsonresponse' | 'tool'
+type SectionType = NonToolcodeSectionType | 'toolcode'
 
 function parse(content: string, use: 'core' | 'json'): TPrompt[] {
 	const lines = content.split('\n')
@@ -46,9 +14,53 @@ function parse(content: string, use: 'core' | 'json'): TPrompt[] {
 
 	let inBlock = false
 	let currentPrompt: Partial<TPrompt> | null = null
-	let currentSection: 'system' | 'user' | 'segment' | 'options' | 'llm' | 'jsonresponse' | null = null
+	let currentSection: SectionType | null = null
 	let currentSegmentName: string | null = null
+	let currentToolcodeLang: string | null = null
+	let currentToolcodeName: string | null = null
 	let sectionContent: string[] = []
+	let pendingToolCodes: { name: string; lang: string; code: string }[] = []
+
+	function flushSection(): void {
+		if (!currentSection || !currentPrompt) return
+		if (currentSection === 'toolcode') {
+			if (currentToolcodeLang && currentToolcodeName && sectionContent.length > 0) {
+				pendingToolCodes.push({
+					name: currentToolcodeName,
+					lang: currentToolcodeLang,
+					code: sectionContent.join('\n').trim()
+				})
+			}
+		} else if (sectionContent.length > 0) {
+			finishSection(currentPrompt, currentSection, sectionContent, use, currentSegmentName)
+		}
+	}
+
+	function finalizeBlock(): void {
+		flushSection()
+		if (currentPrompt && currentPrompt.user) {
+			if (pendingToolCodes.length > 0 && currentPrompt.tool) {
+				for (const tc of pendingToolCodes) {
+					const tool = currentPrompt.tool.find(t => t.name === tc.name && t.spec !== undefined)
+					if (tool) {
+						tool.lang = tc.lang
+						tool.code = tc.code
+					}
+				}
+			}
+			prompts.push(currentPrompt as TPrompt)
+		}
+		pendingToolCodes = []
+	}
+
+	function resetSection(section: SectionType): void {
+		flushSection()
+		currentSection = section
+		currentSegmentName = null
+		currentToolcodeLang = null
+		currentToolcodeName = null
+		sectionContent = []
+	}
 
 	for (let i = 0; i < lines.length; i++) {
 		const line = lines[i]
@@ -56,99 +68,52 @@ function parse(content: string, use: 'core' | 'json'): TPrompt[] {
 
 		if (trimmed === '$$begin') {
 			if (inBlock && currentPrompt) {
-				if (currentSection && sectionContent.length > 0) {
-					finishSection(currentPrompt, currentSection, sectionContent, use, currentSegmentName)
-				}
-				if (currentPrompt.user) {
-					prompts.push(currentPrompt as TPrompt)
-				}
+				finalizeBlock()
 			}
 			inBlock = true
 			currentPrompt = {}
 			currentSection = null
 			currentSegmentName = null
+			currentToolcodeLang = null
+			currentToolcodeName = null
 			sectionContent = []
 			continue
 		}
 
 		if (trimmed === '$$end') {
 			if (inBlock && currentPrompt) {
-				if (currentSection && sectionContent.length > 0) {
-					finishSection(currentPrompt, currentSection, sectionContent, use, currentSegmentName)
-				}
-				if (currentPrompt.user) {
-					prompts.push(currentPrompt as TPrompt)
-				}
+				finalizeBlock()
 			}
 			inBlock = false
 			currentPrompt = null
 			currentSection = null
 			currentSegmentName = null
+			currentToolcodeLang = null
+			currentToolcodeName = null
 			sectionContent = []
 			continue
 		}
 
-		if (!inBlock || !currentPrompt) {
-			continue
-		}
+		if (!inBlock || !currentPrompt) continue
 
-		if (trimmed === '$$system') {
-			if (currentSection && sectionContent.length > 0) {
-				finishSection(currentPrompt, currentSection, sectionContent, use, currentSegmentName)
-			}
-			currentSection = 'system'
-			currentSegmentName = null
-			sectionContent = []
-			continue
-		}
-
-		if (trimmed === '$$user') {
-			if (currentSection && sectionContent.length > 0) {
-				finishSection(currentPrompt, currentSection, sectionContent, use, currentSegmentName)
-			}
-			currentSection = 'user'
-			currentSegmentName = null
-			sectionContent = []
-			continue
-		}
-
-		if (trimmed === '$$options') {
-			if (currentSection && sectionContent.length > 0) {
-				finishSection(currentPrompt, currentSection, sectionContent, use, currentSegmentName)
-			}
-			currentSection = 'options'
-			currentSegmentName = null
-			sectionContent = []
-			continue
-		}
-
-		if (trimmed === '$$llm') {
-			if (currentSection && sectionContent.length > 0) {
-				finishSection(currentPrompt, currentSection, sectionContent, use, currentSegmentName)
-			}
-			currentSection = 'llm'
-			currentSegmentName = null
-			sectionContent = []
-			continue
-		}
-
-		if (trimmed === '$$jsonresponse') {
-			if (currentSection && sectionContent.length > 0) {
-				finishSection(currentPrompt, currentSection, sectionContent, use, currentSegmentName)
-			}
-			currentSection = 'jsonresponse'
-			currentSegmentName = null
-			sectionContent = []
-			continue
-		}
+		if (trimmed === '$$system') { resetSection('system'); continue }
+		if (trimmed === '$$user') { resetSection('user'); continue }
+		if (trimmed === '$$options') { resetSection('options'); continue }
+		if (trimmed === '$$llm') { resetSection('llm'); continue }
+		if (trimmed === '$$jsonresponse') { resetSection('jsonresponse'); continue }
+		if (trimmed === '$$tool') { resetSection('tool'); continue }
 
 		if (trimmed.startsWith('$$segment=')) {
-			if (currentSection && sectionContent.length > 0) {
-				finishSection(currentPrompt, currentSection, sectionContent, use, currentSegmentName)
-			}
-			currentSection = 'segment'
+			resetSection('segment')
 			currentSegmentName = trimmed.substring('$$segment='.length).trim()
-			sectionContent = []
+			continue
+		}
+
+		const toolcodeMatch = trimmed.match(/^\$\$tool=([^=]+)=(.+)$/)
+		if (toolcodeMatch) {
+			resetSection('toolcode')
+			currentToolcodeLang = toolcodeMatch[1]
+			currentToolcodeName = toolcodeMatch[2]
 			continue
 		}
 
@@ -158,18 +123,13 @@ function parse(content: string, use: 'core' | 'json'): TPrompt[] {
 	}
 
 	if (inBlock && currentPrompt) {
-		if (currentSection && sectionContent.length > 0) {
-			finishSection(currentPrompt, currentSection, sectionContent, use, currentSegmentName)
-		}
-		if (currentPrompt.user) {
-			prompts.push(currentPrompt as TPrompt)
-		}
+		finalizeBlock()
 	}
 
 	return prompts
 }
 
-function finishSection(prompt: Partial<TPrompt>, section: 'system' | 'user' | 'segment' | 'options' | 'llm' | 'jsonresponse', lines: string[], use: 'core' | 'json', segmentName?: string | null): void {
+function finishSection(prompt: Partial<TPrompt>, section: NonToolcodeSectionType, lines: string[], use: 'core' | 'json', segmentName?: string | null): void {
 	const content = lines.join('\n').trim()
 	if (section === 'system') {
 		prompt.system = content
@@ -199,6 +159,15 @@ function finishSection(prompt: Partial<TPrompt>, section: 'system' | 'user' | 's
 		}
 	} else if (section === 'jsonresponse') {
 		prompt.jsonresponse = content
+	} else if (section === 'tool') {
+		try {
+			const parsed = JSON.parse(content)
+			if (Array.isArray(parsed)) {
+				prompt.tool = parsed
+			}
+		} catch {
+			// ignore invalid JSON
+		}
 	}
 }
 

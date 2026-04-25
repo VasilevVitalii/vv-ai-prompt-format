@@ -1134,3 +1134,328 @@ $$end`
         expect(result[0].jsonresponse).toBe('{"type": "string"}')
     })
 })
+
+describe('$$tool section', () => {
+    test('парсит серверные инструменты (без spec)', () => {
+        const raw = `$$begin
+$$user
+Do something
+$$tool
+[{"name":"search"},{"name":"calculator"}]
+$$end`
+
+        const result = PromptConvFromString(raw)
+
+        expect(result).toHaveLength(1)
+        expect(result[0].tool).toEqual([
+            { name: 'search' },
+            { name: 'calculator' }
+        ])
+    })
+
+    test('парсит клиентские инструменты (со spec)', () => {
+        const raw = `$$begin
+$$user
+Do something
+$$tool
+[{"name":"search","spec":"searches the web, args: {query: string}"}]
+$$end`
+
+        const result = PromptConvFromString(raw)
+
+        expect(result).toHaveLength(1)
+        expect(result[0].tool).toEqual([
+            { name: 'search', spec: 'searches the web, args: {query: string}' }
+        ])
+    })
+
+    test('парсит смешанный список инструментов', () => {
+        const raw = `$$begin
+$$user
+Do something
+$$tool
+[{"name":"calculator"},{"name":"search","spec":"searches the web, args: {query: string}"}]
+$$end`
+
+        const result = PromptConvFromString(raw)
+
+        expect(result).toHaveLength(1)
+        expect(result[0].tool).toEqual([
+            { name: 'calculator' },
+            { name: 'search', spec: 'searches the web, args: {query: string}' }
+        ])
+    })
+
+    test('игнорирует невалидный JSON в $$tool', () => {
+        const raw = `$$begin
+$$user
+Do something
+$$tool
+not a json
+$$end`
+
+        const result = PromptConvFromString(raw)
+
+        expect(result).toHaveLength(1)
+        expect(result[0].tool).toBeUndefined()
+    })
+
+    test('порядок секций с $$tool не важен', () => {
+        const raw = `$$begin
+$$tool
+[{"name":"search"}]
+$$system
+System prompt
+$$user
+User prompt
+$$end`
+
+        const result = PromptConvFromString(raw)
+
+        expect(result).toHaveLength(1)
+        expect(result[0].user).toBe('User prompt')
+        expect(result[0].system).toBe('System prompt')
+        expect(result[0].tool).toEqual([{ name: 'search' }])
+    })
+
+    test('сериализует серверные инструменты в $$tool', () => {
+        const prompts: TPrompt[] = [{
+            user: 'Test',
+            tool: [{ name: 'search' }, { name: 'calculator' }]
+        }]
+
+        const result = PromptConvToString(prompts)
+
+        expect(result).toContain('$$tool')
+        expect(result).toContain('"name":"search"')
+        expect(result).toContain('"name":"calculator"')
+    })
+
+    test('сериализует клиентские инструменты в $$tool', () => {
+        const prompts: TPrompt[] = [{
+            user: 'Test',
+            tool: [{ name: 'search', spec: 'searches the web, args: {query: string}' }]
+        }]
+
+        const result = PromptConvToString(prompts)
+
+        expect(result).toContain('$$tool')
+        expect(result).toContain('"spec":"searches the web, args: {query: string}"')
+    })
+
+    test('не сериализует $$tool если массив пустой', () => {
+        const prompts: TPrompt[] = [{
+            user: 'Test',
+            tool: []
+        }]
+
+        const result = PromptConvToString(prompts)
+
+        expect(result).not.toContain('$$tool')
+    })
+
+    test('не сериализует $$tool если поле отсутствует', () => {
+        const prompts: TPrompt[] = [{ user: 'Test' }]
+
+        const result = PromptConvToString(prompts)
+
+        expect(result).not.toContain('$$tool')
+    })
+
+    test('round-trip сохраняет инструменты', () => {
+        const original: TPrompt[] = [{
+            user: 'Do something',
+            tool: [
+                { name: 'calculator' },
+                { name: 'search', spec: 'searches the web, args: {query: string}' }
+            ]
+        }]
+
+        const serialized = PromptConvToString(original)
+        const parsed = PromptConvFromString(serialized)
+
+        expect(parsed).toHaveLength(1)
+        expect(parsed[0].tool).toEqual(original[0].tool)
+    })
+
+    test('round-trip сохраняет инструменты вместе с остальными секциями', () => {
+        const original: TPrompt[] = [{
+            llm: { url: 'http://localhost:11434', model: 'llama2' },
+            system: 'You are helpful',
+            user: 'Do something',
+            options: { temperature: 0.7 },
+            tool: [
+                { name: 'calculator' },
+                { name: 'search', spec: 'searches the web' }
+            ]
+        }]
+
+        const serialized = PromptConvToString(original)
+        const parsed = PromptConvFromString(serialized)
+
+        expect(parsed).toHaveLength(1)
+        expect(parsed[0].llm).toEqual(original[0].llm)
+        expect(parsed[0].system).toBe(original[0].system)
+        expect(parsed[0].user).toBe(original[0].user)
+        expect(parsed[0].options).toEqual(original[0].options)
+        expect(parsed[0].tool).toEqual(original[0].tool)
+    })
+})
+
+describe('$$tool=<lang>=<name> section (inline tools)', () => {
+    test('парсит inline инструмент', () => {
+        const raw = `$$begin
+$$user
+Do something
+$$tool
+[{"name":"search","spec":"searches the web"}]
+$$tool=JS=search
+return fetch(args.query)
+$$end`
+
+        const result = PromptConvFromString(raw)
+
+        expect(result).toHaveLength(1)
+        expect(result[0].tool).toHaveLength(1)
+        expect(result[0].tool![0]).toEqual({
+            name: 'search',
+            spec: 'searches the web',
+            lang: 'JS',
+            code: 'return fetch(args.query)'
+        })
+    })
+
+    test('парсит inline инструмент с многострочным кодом', () => {
+        const raw = `$$begin
+$$user
+Do something
+$$tool
+[{"name":"calc","spec":"calculates expression"}]
+$$tool=PY=calc
+def calc(expr):
+    return eval(expr)
+$$end`
+
+        const result = PromptConvFromString(raw)
+
+        expect(result).toHaveLength(1)
+        expect(result[0].tool![0].lang).toBe('PY')
+        expect(result[0].tool![0].code).toBe('def calc(expr):\n    return eval(expr)')
+    })
+
+    test('порядок $$tool и $$tool=<lang>=<name> не важен', () => {
+        const raw = `$$begin
+$$tool=JS=search
+return fetch(args.query)
+$$user
+Do something
+$$tool
+[{"name":"search","spec":"searches the web"}]
+$$end`
+
+        const result = PromptConvFromString(raw)
+
+        expect(result).toHaveLength(1)
+        expect(result[0].tool![0].lang).toBe('JS')
+        expect(result[0].tool![0].code).toBe('return fetch(args.query)')
+    })
+
+    test('игнорирует код если инструмент не имеет spec (серверный)', () => {
+        const raw = `$$begin
+$$user
+Do something
+$$tool
+[{"name":"calculator"}]
+$$tool=JS=calculator
+return a + b
+$$end`
+
+        const result = PromptConvFromString(raw)
+
+        expect(result).toHaveLength(1)
+        expect(result[0].tool![0].lang).toBeUndefined()
+        expect(result[0].tool![0].code).toBeUndefined()
+    })
+
+    test('игнорирует код если нет соответствующей записи в $$tool', () => {
+        const raw = `$$begin
+$$user
+Do something
+$$tool
+[{"name":"calculator"}]
+$$tool=JS=unknown
+return 42
+$$end`
+
+        const result = PromptConvFromString(raw)
+
+        expect(result).toHaveLength(1)
+        expect(result[0].tool).toHaveLength(1)
+        expect(result[0].tool![0].name).toBe('calculator')
+        expect(result[0].tool![0].lang).toBeUndefined()
+    })
+
+    test('парсит несколько inline инструментов', () => {
+        const raw = `$$begin
+$$user
+Do something
+$$tool
+[{"name":"search","spec":"searches the web"},{"name":"calc","spec":"calculates"}]
+$$tool=JS=search
+return fetch(args.query)
+$$tool=PY=calc
+return eval(args.expr)
+$$end`
+
+        const result = PromptConvFromString(raw)
+
+        expect(result).toHaveLength(1)
+        expect(result[0].tool![0]).toMatchObject({ name: 'search', lang: 'JS', code: 'return fetch(args.query)' })
+        expect(result[0].tool![1]).toMatchObject({ name: 'calc', lang: 'PY', code: 'return eval(args.expr)' })
+    })
+
+    test('сериализует inline инструмент в отдельную секцию', () => {
+        const prompts: TPrompt[] = [{
+            user: 'Test',
+            tool: [{ name: 'search', spec: 'searches the web', lang: 'JS', code: 'return fetch(args.query)' }]
+        }]
+
+        const result = PromptConvToString(prompts)
+
+        expect(result).toContain('$$tool\n')
+        expect(result).toContain('"name":"search"')
+        expect(result).toContain('"spec":"searches the web"')
+        expect(result).not.toContain('"lang"')
+        expect(result).not.toContain('"code"')
+        expect(result).toContain('$$tool=JS=search')
+        expect(result).toContain('return fetch(args.query)')
+    })
+
+    test('не сериализует секцию кода если lang или code отсутствуют', () => {
+        const prompts: TPrompt[] = [{
+            user: 'Test',
+            tool: [{ name: 'search', spec: 'searches the web' }]
+        }]
+
+        const result = PromptConvToString(prompts)
+
+        expect(result).not.toMatch(/\$\$tool=/)
+    })
+
+    test('round-trip сохраняет inline инструмент', () => {
+        const original: TPrompt[] = [{
+            user: 'Do something',
+            tool: [
+                { name: 'calculator' },
+                { name: 'search', spec: 'searches the web' },
+                { name: 'exec', spec: 'executes code', lang: 'JS', code: 'return eval(args.expr)' }
+            ]
+        }]
+
+        const serialized = PromptConvToString(original)
+        const parsed = PromptConvFromString(serialized)
+
+        expect(parsed).toHaveLength(1)
+        expect(parsed[0].tool).toEqual(original[0].tool)
+    })
+})
