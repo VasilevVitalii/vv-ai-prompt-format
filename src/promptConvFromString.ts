@@ -6,7 +6,7 @@ export function PromptConvFromString(raw: string, use: 'core' | 'json' = 'core')
 }
 
 type NonToolcodeSectionType = 'system' | 'user' | 'segment' | 'options' | 'llm' | 'jsonresponse' | 'tool'
-type SectionType = NonToolcodeSectionType | 'toolcode'
+type SectionType = NonToolcodeSectionType | 'toolcode' | 'toolspec'
 
 function parse(content: string, use: 'core' | 'json'): TPrompt[] {
 	const lines = content.split('\n')
@@ -18,8 +18,10 @@ function parse(content: string, use: 'core' | 'json'): TPrompt[] {
 	let currentSegmentName: string | null = null
 	let currentToolcodeLang: string | null = null
 	let currentToolcodeName: string | null = null
+	let currentToolspecName: string | null = null
 	let sectionContent: string[] = []
 	let pendingToolCodes: { name: string; lang: string; code: string }[] = []
+	let pendingToolSpecs: { name: string; spec: string }[] = []
 
 	function flushSection(): void {
 		if (!currentSection || !currentPrompt) return
@@ -31,6 +33,13 @@ function parse(content: string, use: 'core' | 'json'): TPrompt[] {
 					code: sectionContent.join('\n').trim()
 				})
 			}
+		} else if (currentSection === 'toolspec') {
+			if (currentToolspecName && sectionContent.length > 0) {
+				pendingToolSpecs.push({
+					name: currentToolspecName,
+					spec: sectionContent.join('\n').trim()
+				})
+			}
 		} else if (sectionContent.length > 0) {
 			finishSection(currentPrompt, currentSection, sectionContent, use, currentSegmentName)
 		}
@@ -39,7 +48,14 @@ function parse(content: string, use: 'core' | 'json'): TPrompt[] {
 	function finalizeBlock(): void {
 		flushSection()
 		if (currentPrompt && currentPrompt.user) {
-			if (pendingToolCodes.length > 0 && currentPrompt.tool) {
+			if (currentPrompt.tool) {
+				// merge specs first so code merge can correctly check spec presence
+				for (const ts of pendingToolSpecs) {
+					const tool = currentPrompt.tool.find(t => t.name === ts.name)
+					if (tool) {
+						tool.spec = ts.spec
+					}
+				}
 				for (const tc of pendingToolCodes) {
 					const tool = currentPrompt.tool.find(t => t.name === tc.name && t.spec !== undefined)
 					if (tool) {
@@ -51,6 +67,7 @@ function parse(content: string, use: 'core' | 'json'): TPrompt[] {
 			prompts.push(currentPrompt as TPrompt)
 		}
 		pendingToolCodes = []
+		pendingToolSpecs = []
 	}
 
 	function resetSection(section: SectionType): void {
@@ -59,6 +76,7 @@ function parse(content: string, use: 'core' | 'json'): TPrompt[] {
 		currentSegmentName = null
 		currentToolcodeLang = null
 		currentToolcodeName = null
+		currentToolspecName = null
 		sectionContent = []
 	}
 
@@ -76,6 +94,7 @@ function parse(content: string, use: 'core' | 'json'): TPrompt[] {
 			currentSegmentName = null
 			currentToolcodeLang = null
 			currentToolcodeName = null
+			currentToolspecName = null
 			sectionContent = []
 			continue
 		}
@@ -90,6 +109,7 @@ function parse(content: string, use: 'core' | 'json'): TPrompt[] {
 			currentSegmentName = null
 			currentToolcodeLang = null
 			currentToolcodeName = null
+			currentToolspecName = null
 			sectionContent = []
 			continue
 		}
@@ -106,6 +126,12 @@ function parse(content: string, use: 'core' | 'json'): TPrompt[] {
 		if (trimmed.startsWith('$$segment=')) {
 			resetSection('segment')
 			currentSegmentName = trimmed.substring('$$segment='.length).trim()
+			continue
+		}
+
+		if (trimmed.startsWith('$$tool=spec=')) {
+			resetSection('toolspec')
+			currentToolspecName = trimmed.substring('$$tool=spec='.length).trim()
 			continue
 		}
 
@@ -160,13 +186,9 @@ function finishSection(prompt: Partial<TPrompt>, section: NonToolcodeSectionType
 	} else if (section === 'jsonresponse') {
 		prompt.jsonresponse = content
 	} else if (section === 'tool') {
-		try {
-			const parsed = JSON.parse(content)
-			if (Array.isArray(parsed)) {
-				prompt.tool = parsed
-			}
-		} catch {
-			// ignore invalid JSON
+		const names = content.split('\n').map(l => l.trim()).filter(l => l.length > 0)
+		if (names.length > 0) {
+			prompt.tool = names.map(name => ({ name }))
 		}
 	}
 }

@@ -50,7 +50,10 @@ $$jsonresponse
 $$segment=segmentName
 Segment content here
 $$tool
-[{"name":"calculator"},{"name":"search","spec":"Searches the web. Args: query (string)"}]
+calculator
+search
+$$tool=spec=search
+Searches the web. Args: query (string)
 $$tool=JS=search
 return await fetch(`https://api.search.com?q=${args.query}`).then(r => r.json())
 $$end
@@ -66,8 +69,9 @@ $$end
 - `$$options` - LLM settings section (optional)
 - `$$jsonresponse` - JSON Schema for structured response output (optional)
 - `$$segment=name` - Named text segments (optional)
-- `$$tool` - List of tools available for the model (optional)
-- `$$tool=<lang>=<name>` - Inline code for a tool (optional, requires a matching entry with `spec` in `$$tool`)
+- `$$tool` - List of tool names, one per line (optional)
+- `$$tool=spec=<name>` - Tool specification for the model (optional, requires a matching name in `$$tool`)
+- `$$tool=<lang>=<name>` - Inline code for a tool (optional, requires a matching `$$tool=spec=<name>`)
 - Text before the first `$$begin` and after the last `$$end` is ignored
 - Section order within a block doesn't matter
 - All sections except `$$user` are optional
@@ -216,13 +220,13 @@ console.log(parsed[0].segment.code) // Access segment content
 
 ### Working with tools
 
-The `$$tool` section defines a list of tools available to the model. Each tool is an object with `name` and optional `spec` fields. The `spec` field is a free-form description for the model explaining what the tool does and what arguments to pass.
+The `$$tool` section lists tool names — one per line. Tool specification for the model goes in a separate `$$tool=spec=<name>` section, and inline executable code in `$$tool=<lang>=<name>`.
 
-Three execution modes are supported depending on the presence of `spec` and a code section:
+Three execution modes are supported depending on the presence of `$$tool=spec=` and `$$tool=<lang>=`:
 
 #### 1. Server-side tools — service executes, no spec needed
 
-The service already knows these tools. Only the tool names are passed. The `spec` field is omitted.
+The service already knows these tools. Only the names are listed in `$$tool`.
 
 ```typescript
 import { PromptConvFromString, PromptConvToString, TPrompt } from 'vv-ai-prompt-format'
@@ -241,7 +245,8 @@ console.log(text)
 // $$user
 // What is 2 + 2?
 // $$tool
-// [{"name":"calculator"},{"name":"datetime"}]
+// calculator
+// datetime
 // $$end
 
 const parsed = PromptConvFromString(text)
@@ -251,7 +256,7 @@ console.log(parsed[0].tool)
 
 #### 2. Client-side tools — client executes, spec required
 
-The service has no code for the tool. When the model decides to call it, the service asks the requesting party (the client) to execute it and return the result. The `spec` tells the model what the tool does and what arguments to provide.
+The service has no code for the tool. When the model decides to call it, the service asks the requesting party (the client) to execute it and return the result. The spec in `$$tool=spec=<name>` tells the model what the tool does and what arguments to provide.
 
 ```typescript
 import { PromptConvFromString, PromptConvToString, TPrompt } from 'vv-ai-prompt-format'
@@ -272,7 +277,9 @@ console.log(text)
 // $$user
 // Search for the latest TypeScript release
 // $$tool
-// [{"name":"search","spec":"Searches the web and returns results. Args: query (string) — search query"}]
+// search
+// $$tool=spec=search
+// Searches the web and returns results. Args: query (string) — search query
 // $$end
 
 const parsed = PromptConvFromString(text)
@@ -282,7 +289,7 @@ console.log(parsed[0].tool)
 
 #### 3. Inline tools — service executes provided code, spec required
 
-The tool code is delivered directly in the request via a `$$tool=<lang>=<name>` section. The service executes the code itself. The `spec` field is still required for the model to know when and how to call the tool. The `lang` value is a free-form string (e.g. `JS`, `PY`) — the library does not validate it.
+The tool code is delivered directly in the request via a `$$tool=<lang>=<name>` section. The service executes the code itself. A `$$tool=spec=<name>` is also required so the model knows when and how to call the tool. The `lang` value is a free-form string (e.g. `JS`, `PY`) — the library does not validate it.
 
 ```typescript
 import { PromptConvFromString, PromptConvToString, TPrompt } from 'vv-ai-prompt-format'
@@ -305,7 +312,9 @@ console.log(text)
 // $$user
 // Add 5 and 7
 // $$tool
-// [{"name":"add","spec":"Adds two numbers. Args: a (number), b (number)"}]
+// add
+// $$tool=spec=add
+// Adds two numbers. Args: a (number), b (number)
 // $$tool=JS=add
 // return args.a + args.b
 // $$end
